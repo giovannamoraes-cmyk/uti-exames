@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>UTI Adulto — Evolução Laboratorial V8</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f2f2f2;color:#111}
+.no-print{padding:14px}.panel{max-width:1200px;margin:auto;background:#fff;border:1px solid #aaa;border-radius:6px;padding:14px}
+h1{font-size:20px;margin:0 0 10px}h2{font-size:15px;margin:14px 0 7px}
+input,select,textarea,button{font:inherit}input,select{padding:7px;border:1px solid #888;border-radius:4px}
+textarea{width:100%;min-height:160px;padding:8px;font-family:monospace;font-size:12px}
+button{padding:8px 11px;margin:4px 3px 4px 0;border:1px solid #777;border-radius:4px;background:#fff;cursor:pointer}
+button.primary{font-weight:bold}
+.patientbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.status{margin-top:8px;padding:7px;background:#f7f7f7;border:1px solid #bbb;font-size:12px}
+.instructions{font-size:12px;line-height:1.45}
+
+/* A folha é construída com dimensões fixas de A4 para não "desmanchar" na impressão. */
+.sheet{width:210mm;height:297mm;margin:10px auto;background:#fff;padding:10mm 9mm}
+.meta{width:100%;border-collapse:collapse;margin:0}
+.meta td{border:1px solid #222;height:7mm;padding:1mm;font-size:10px}
+.meta .label{font-weight:bold;width:auto}
+.meta .nameval{width:39%}.meta .ageval{width:9%}.meta .dival{width:14%}
+
+.lab{width:100%;border-collapse:collapse;table-layout:fixed}
+.lab th,.lab td{border:1px solid #222;height:5.0mm;padding:.4mm 1mm;font-size:7.5px;line-height:1;overflow:hidden;white-space:nowrap}
+.lab th{font-weight:bold;text-align:center}
+.lab th:first-child,.lab td:first-child{width:28%;text-align:left}
+.lab th:not(:first-child),.lab td:not(:first-child){width:10.2857%;text-align:center}
+.lab tbody tr:nth-child(odd) td{background:#e8e8e8}
+.lab tbody tr:nth-child(even) td{background:#ffffff}
+.lab .date-row td{height:6.5mm;font-weight:bold}
+.lab .strong-top td{border-top:2px solid #222}
+.lab .gas-top td{border-top:2px solid #222}
+.lab .last td{height:5.5mm}
+
+.backtitle{border:1px solid #222;border-bottom:0;text-align:center;font-weight:bold;font-size:10.5px;padding:2mm}
+.cult{width:100%;border-collapse:collapse;table-layout:fixed}
+.cult th,.cult td{border:1px solid #222;font-size:8.5px;height:7mm;padding:1mm;text-align:center}
+.cult th:nth-child(1){width:14%}.cult th:nth-child(2){width:23%}.cult th:nth-child(3){width:17%}.cult th:nth-child(4){width:22%}.cult th:nth-child(5){width:24%}
+
+.pagebreak{page-break-before:always}
+
+@media print{
+ body{background:#fff}
+ .no-print{display:none!important}
+ .sheet{margin:0;width:210mm;height:297mm;padding:10mm 9mm;page-break-after:always}
+ .sheet:last-child{page-break-after:auto}
+ @page{size:A4 portrait;margin:0}
+}
+</style>
+</head>
+<body>
+<div class="no-print">
+<div class="panel">
+<h1>UTI Adulto — Preenchedor de Evolução</h1>
+<div class="instructions">
+<b>V12:</b> a frente agora mantém <b>sempre 7 colunas de evolução</b>, como na folha original. Os dias vão sendo preenchidos da esquerda para a direita e as colunas que ainda não têm exame ficam vazias.<br>O programa reconhece tanto o nome completo do laboratório quanto a sigla usada na folha (ex.: <b>Proteína C Reativa → PCR</b>; <b>Sódio → Na+</b>; <b>Potássio → K+</b>).
+</div>
+
+<h2>Paciente</h2>
+<div class="patientbar">
+<select id="patientSelect" onchange="selectPatient()"><option value="">— Novo paciente —</option></select>
+<input id="name" placeholder="Nome do paciente">
+<input id="age" placeholder="Idade" style="width:90px">
+<input id="diuti" placeholder="DI UTI" style="width:100px">
+<button class="primary" onclick="newPatient()">Criar / selecionar paciente</button>
+<button onclick="savePatient()">Salvar dados</button>
+<button onclick="dischargePatient()" title="Dar alta e retirar da lista de pacientes ativos">✕ Dar alta</button>
+</div>
+
+<h2>Informações para cálculos do dia <span style="font-weight:normal;font-size:12px">(não aparecem na folha impressa)</span></h2>
+<div style="display:flex;flex-wrap:wrap;gap:7px;align-items:end">
+<label>FiO₂ (%)<br><input id="fio2" type="number" min="21" max="100" step="1" placeholder="ex.: 40" style="width:90px"></label>
+<label>PAM (mmHg)<br><input id="pam" type="number" min="0" step="1" placeholder="ex.: 72" style="width:90px"></label>
+<label>Glasgow<br><input id="gcs" type="number" min="3" max="15" step="1" placeholder="3–15" style="width:90px"></label>
+<label>Diurese 24h (mL)<br><input id="urine" type="number" min="0" step="1" placeholder="ex.: 800" style="width:110px"></label>
+<label>Suporte respiratório<br><select id="respSupport"><option value="no">Não</option><option value="yes">Sim</option></select></label>
+<label>Vasopressor<br><select id="pressor"><option value="none">Nenhum</option><option value="dop_le5">Dopamina ≤5</option><option value="dobutamine">Dobutamina</option><option value="dop_5_15">Dopamina >5–15</option><option value="epi_norepi_le01">Adrenalina/Noradrenalina ≤0,1</option><option value="dop_gt15">Dopamina >15</option><option value="epi_norepi_gt01">Adrenalina/Noradrenalina >0,1</option></select></label>
+</div>
+<p style="font-size:11px;color:#555;margin:5px 0 10px">O programa usa esses dados apenas para calcular P/F e SOFA e grava somente os valores calculados na tabela.</p>
+<textarea id="raw" placeholder="Cole aqui o resultado completo do laboratório do dia."></textarea><br>
+<button class="primary" onclick="addCollection()">Adicionar na próxima coluna</button>
+<button onclick="document.getElementById('raw').value=''">Limpar texto</button>
+<button onclick="window.print()">Imprimir frente + verso</button>
+<button onclick="backupAll()">Backup de todos os pacientes</button>
+<button onclick="showDischarged()">Pacientes com alta</button>
+<button onclick="document.getElementById('restore').click()">Restaurar backup</button>
+<input id="restore" type="file" accept=".json" style="display:none" onchange="restoreAll(event)">
+<div id="status" class="status"></div>
+</div>
+</div>
+
+<!-- FRENTE -->
+<div class="sheet">
+<table class="meta">
+<tr>
+<td class="label">Nome:</td><td id="pname" class="nameval"></td>
+<td class="label">Idade:</td><td id="page" class="ageval"></td>
+<td class="label">DI UTI:</td><td id="pdi" class="dival"></td>
+</tr>
+</table>
+
+<table class="lab" id="labTable">
+<thead></thead><tbody></tbody>
+</table>
+</div>
+
+<!-- VERSO -->
+<div class="sheet">
+<div class="backtitle">UTI ADULTO – RESULTADOS DE CULTURAS – SENSIBILIDADE</div>
+<table class="cult">
+<thead><tr><th>DATA</th><th>MATERIAL</th><th>GRAM</th><th>GERME ISOLADO</th><th>SENSIBILIDADE</th></tr></thead>
+<tbody id="cultBody"></tbody>
+</table>
+</div>
+
+<script>
+const KEY="uti_adulto_evolucao_v12";
+const MAX_COLS=7;
+const examRows=["Hemoglobina","Hematócrito","Leucócitos","Mielócitos","Metamielócitos","Bastões","Segmentados","Linfócitos","Monócitos","Eosinófilos","Basófilos","Plaquetas","TTPA ratio","TP","INR","Fibrinogênio","Bilirrubina T","Bilirrubina D","Bilirrubina I","Albumina","TGO","TGP","Fosf. Alcalina","Gama GT","Amilase","Lipase","LDH","Triglicerídeos","Ureia","Creatinina","Na+","K+","Mg++","Ca++","Cl-","PO4-","PCR","CPK","CPS-MB","Troponina","pH","PCO2","PO2","HCO3","BE","SO2A","PO2/FiO2","Lactato","SOFA"];
+const aliases={
+"Hemoglobina":["hemoglobina"],"Hematócrito":["hematocrito"],"Leucócitos":["leucocitos"],"Mielócitos":["mielocitos"],"Metamielócitos":["metamielocitos"],"Bastões":["bastoes"],"Segmentados":["segmentados"],"Linfócitos":["linfocitos"],"Monócitos":["monocitos"],"Eosinófilos":["eosinofilos"],"Basófilos":["basofilos"],"Plaquetas":["plaquetas"],
+"TTPA ratio":["ttpa ratio"],"TP":["tempo de protrombina","tp"],"INR":["inr"],"Fibrinogênio":["fibrinogenio"],"Bilirrubina T":["bilirrubina total"],"Bilirrubina D":["bilirrubina direta"],"Bilirrubina I":["bilirrubina indireta"],"Albumina":["albumina"],"TGO":["tgo","ast"],"TGP":["tgp","alt"],"Fosf. Alcalina":["fosfatase alcalina"],"Gama GT":["gama gt","ggt"],"Amilase":["amilase"],"Lipase":["lipase"],"LDH":["ldh"],"Triglicerídeos":["triglicerideos"],
+"Ureia":["ureia"],"Creatinina":["creatinina"],"Na+":["sodio","na+","na"],"K+":["potassio","k+","k"],"Mg++":["magnesio","mg++","mg"],"Ca++":["calcio","ca++","ca"],"Cl-":["cloro","cl-","cl"],"PO4-":["fosforo","po4-","po4"],"PCR":["proteina c reativa","pcr"],"CPK":["cpk"],"CPS-MB":["cps-mb","ck-mb","cpk-mb"],"Troponina":["troponina"],"pH":["ph"],"PCO2":["pco2"],"PO2":["po2"],"HCO3":["hco3","bicarbonato"],"BE":["base ef","base excess"],"SO2A":["saturacao de o2","saturacao o2","so2a","sao2"],"PO2/FiO2":["po2/fio2","pao2/fio2"],"Lactato":["lactato"],"SOFA":["sofa"]};
+
+let db={patients:{},selected:""};
+
+function esc(s){return String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));}
+function msg(x){document.getElementById("status").textContent=x;}
+const SUPABASE_URL="https://jlltsmpzgxmuimmqzcyw.supabase.co";
+const SUPABASE_KEY="sb_publishable_RgzhsLXEMadxvAQmQQ-0EA_pnYWa9du";
+const SB_HEADERS={"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Content-Type":"application/json","Prefer":"return=minimal"};
+
+function persistLocal(){localStorage.setItem(KEY,JSON.stringify(db));}
+async function persist(){
+  persistLocal();
+  try{
+    for(const id of Object.keys(db.patients)){
+      const p=db.patients[id];
+      const q=SUPABASE_URL+"/rest/v1/pacientes?nome=eq."+encodeURIComponent(p.name);
+      const existing=await fetch(q,{headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
+      const rows=await existing.json();
+      const payload={nome:p.name,dados:p,atualizado_em:new Date().toISOString()};
+      if(Array.isArray(rows)&&rows.length){
+        await fetch(SUPABASE_URL+"/rest/v1/pacientes?id=eq."+encodeURIComponent(rows[0].id),{method:"PATCH",headers:SB_HEADERS,body:JSON.stringify({dados:p,atualizado_em:new Date().toISOString()})});
+      }else{
+        await fetch(SUPABASE_URL+"/rest/v1/pacientes",{method:"POST",headers:SB_HEADERS,body:JSON.stringify(payload)});
+      }
+    }
+    msg("✓ Dados salvos online.");
+  }catch(e){
+    console.error(e);msg("⚠ Salvo neste dispositivo, mas não foi possível sincronizar com a nuvem.");
+  }
+}
+async function load(){
+  try{
+    const r=await fetch(SUPABASE_URL+"/rest/v1/pacientes?select=id,nome,dados&order=nome.asc",{headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY}});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const rows=await r.json();
+    const patients={};
+    rows.forEach(row=>{
+      const p=row.dados||{};
+      p.name=p.name||row.nome;
+      patients[String(p.name||row.nome).toUpperCase()]=p;
+    });
+    db={patients,selected:db.selected&&patients[db.selected]?db.selected:""};
+    persistLocal();
+    renderPatients();
+    if(db.selected)document.getElementById("patientSelect").value=db.selected;
+    selectPatient(false);
+    msg("✓ Dados carregados da nuvem.");
+  }catch(e){
+    try{let x=JSON.parse(localStorage.getItem(KEY)||'null');if(x&&x.patients)db=x;}catch(_){}
+    renderPatients();selectPatient(false);msg("⚠ Nuvem indisponível; usando os dados deste dispositivo.");
+  }
+}
+function current(){return db.patients[db.selected]||null;}
+function renderPatients(){
+ const s=document.getElementById("patientSelect");
+ s.innerHTML='<option value="">— Novo paciente —</option>';
+ Object.keys(db.patients).filter(id=>db.patients[id].active!==false).sort().forEach(id=>{
+   const o=document.createElement("option");o.value=id;o.textContent=db.patients[id].name;s.appendChild(o);
+ });
+ s.value=db.selected||"";
+}
+function selectPatient(save=true){
+ db.selected=document.getElementById("patientSelect").value;
+ const p=current();
+ document.getElementById("name").value=p?.name||"";
+ document.getElementById("age").value=p?.age||"";
+ document.getElementById("diuti").value=p?.diuti||"";
+ persist();render();
+ if(p)msg("Paciente carregado: "+p.name);
+}
+function newPatient(){
+ const name=document.getElementById("name").value.trim();
+ if(!name){msg("Digite o nome do paciente.");return}
+ const id=name.toUpperCase();
+ if(!db.patients[id]){
+   db.patients[id]={name,age:document.getElementById("age").value.trim(),diuti:document.getElementById("diuti").value.trim(),cols:[],cultures:[],active:true,dischargeDate:""};
+ }
+ db.selected=id;persist();renderPatients();document.getElementById("patientSelect").value=id;render();
+ msg("✓ Paciente selecionado: "+name);
+}
+function dischargePatient(){
+ if(!db.selected){msg("Primeiro selecione um paciente.");return}
+ const p=current();
+ if(!p)return;
+ if(!confirm("Dar alta de "+p.name+"? Os dados serão mantidos arquivados."))return;
+ p.active=false;
+ p.dischargeDate=new Date().toLocaleDateString("pt-BR");
+ const old=p.name;
+ db.selected="";
+ persist();
+ renderPatients();
+ document.getElementById("patientSelect").value="";
+ document.getElementById("name").value="";
+ document.getElementById("age").value="";
+ document.getElementById("diuti").value="";
+ render();
+ msg("✓ Alta registrada para "+old+". Os dados continuam arquivados.");
+}
+function showDischarged(){
+ const ids=Object.keys(db.patients).filter(id=>db.patients[id].active===false);
+ if(!ids.length){msg("Não há pacientes com alta arquivados.");return}
+ const names=ids.sort().map(id=>db.patients[id].name+" (alta: "+(db.patients[id].dischargeDate||"sem data")+")").join("\n");
+ alert("PACIENTES COM ALTA\n\n"+names+"\n\nOs dados permanecem salvos no backup e no navegador.");
+}
+function savePatient(){
+ if(!db.selected){newPatient();return}
+ const p=current();
+ p.name=document.getElementById("name").value.trim()||p.name;
+ p.age=document.getElementById("age").value.trim();
+ p.diuti=document.getElementById("diuti").value.trim();
+ persist();renderPatients();render();msg("✓ Dados do paciente salvos.");
+}
+function detectDate(t){
+ const m=t.match(/\b(\d{2})[\/.-](\d{2})[\/.-](\d{4})\b/);
+ return m?m[1]+"/"+m[2]+"/"+m[3]:"";
+}
+function norm(s){
+ return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+}
+function getValue(text,label){
+ const s=norm(text).replace(/\r?\n/g," ");
+ for(const a of (aliases[label]||[label])){
+   const aa=norm(a);
+   const boundary = aa.length<=2 ? "\\b" : "";
+   const safe=aa.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+   const re=new RegExp(boundary+safe+"\\s*[:=]?\\s*(-?\\d+(?:[.,]\\d+)?)","i");
+   const m=s.match(re);if(m)return m[1];
+ }
+ return "";
+}
+function parseCollection(text){
+ const p=current();
+ const c={date:detectDate(text)||("Coleta "+((p?.cols?.length||0)+1)),values:{}};
+ examRows.forEach(e=>c.values[e]=getValue(text,e));
+ return c;
+}
+function num(v){return v===""||v==null?null:parseFloat(String(v).replace(",", "."));}
+function calculateScores(c){
+ const fio=num(document.getElementById("fio2").value);
+ const pam=num(document.getElementById("pam").value);
+ const gcs=num(document.getElementById("gcs").value);
+ const urine=num(document.getElementById("urine").value);
+ const support=document.getElementById("respSupport").value==="yes";
+ const pressor=document.getElementById("pressor").value;
+ const po2=num(c.values["PO2"]);
+ const plate=num(c.values["Plaquetas"]);
+ const bili=num(c.values["Bilirrubina T"]);
+ const creat=num(c.values["Creatinina"]);
+
+ // P/F: FiO2 is entered as percent (e.g. 40), converted to fraction.
+ if(po2!=null && fio!=null && fio>0) c.values["PO2/FiO2"]=(po2/(fio/100)).toFixed(0).replace(".",",");
+
+ // SOFA
+ let resp=null, coag=null, liver=null, cardio=null, neuro=null, renal=null;
+ const pf=(po2!=null && fio!=null && fio>0)?po2/(fio/100):null;
+ if(pf!=null){
+   if(pf>=400) resp=0; else if(pf>=300) resp=1; else if(pf>=200) resp=2; else if(pf>=100 && support) resp=3; else if(pf<100 && support) resp=4;
+   else if(pf<200) resp=2; // 3 e 4 pontos só quando há suporte respiratório
+ }
+ if(plate!=null){if(plate>=150)coag=0;else if(plate>=100)coag=1;else if(plate>=50)coag=2;else if(plate>=20)coag=3;else coag=4;}
+ if(bili!=null){if(bili<1.2)liver=0;else if(bili<2)liver=1;else if(bili<6)liver=2;else if(bili<12)liver=3;else liver=4;}
+ if(pam!=null){if(pam>=70)cardio=0;else cardio=1;}
+ if(pressor!=="none"){
+   if(pressor==="dop_le5"||pressor==="dobutamine")cardio=2;
+   else if(pressor==="dop_5_15"||pressor==="epi_norepi_le01")cardio=3;
+   else if(pressor==="dop_gt15"||pressor==="epi_norepi_gt01")cardio=4;
+ }
+ if(gcs!=null){if(gcs===15)neuro=0;else if(gcs>=13)neuro=1;else if(gcs>=10)neuro=2;else if(gcs>=6)neuro=3;else neuro=4;}
+ if(creat!=null || urine!=null){
+   let rc=null,ru=null;
+   if(creat!=null){if(creat<1.2)rc=0;else if(creat<2)rc=1;else if(creat<3.5)rc=2;else if(creat<5)rc=3;else rc=4;}
+   if(urine!=null){if(urine<200)ru=4;else if(urine<500)ru=3;else ru=0;}
+   renal=Math.max(rc??0,ru??0);
+ }
+ const parts=[resp,coag,liver,cardio,neuro,renal];
+ if(parts.some(x=>x!=null)) c.values["SOFA"]=String(parts.reduce((a,x)=>a+(x??0),0));
+}
+function clearCalcFields(){
+ ["fio2","pam","gcs","urine"].forEach(id=>document.getElementById(id).value="");
+ document.getElementById("respSupport").value="no";
+ document.getElementById("pressor").value="none";
+}
+function addCollection(){
+ if(!db.selected){msg("Primeiro crie/selecione o paciente.");return}
+ const raw=document.getElementById("raw").value.trim();
+ if(!raw){msg("Cole o resultado do laboratório.");return}
+ const p=current();
+ if(p.cols.length>=MAX_COLS){msg("As 7 colunas da folha já estão preenchidas. Para continuar, será necessária uma nova folha.");return}
+ const c=parseCollection(raw);
+ calculateScores(c);
+ p.cols.push(c);persist();render();document.getElementById("raw").value="";clearCalcFields();
+ msg("✓ Coleta adicionada na coluna "+p.cols.length+" com P/F e SOFA calculados quando havia dados suficientes.");
+}
+function render(){
+ const p=current();
+ document.getElementById("pname").textContent=p?.name||"";
+ document.getElementById("page").textContent=p?.age||"";
+ document.getElementById("pdi").textContent=p?.diuti||"";
+ const cols=p?.cols||[];
+ let head="<tr><th>Data:</th>";
+ for(let i=0;i<MAX_COLS;i++)head+="<th>"+esc(cols[i]?.date||"")+"</th>";
+ head+="</tr>";
+ document.querySelector("#labTable thead").innerHTML=head;
+ document.querySelector("#labTable tbody").innerHTML=examRows.map((e,i)=>{
+   let cls=(i===11||i===17||i===27||i===36||i===40)?"strong-top":"";
+   if(i===40)cls+=" gas-top";
+   return "<tr class='"+cls+"'><td>"+esc(e)+"</td>"+Array.from({length:MAX_COLS},(_,j)=>"<td>"+esc(cols[j]?.values?.[e]||"")+"</td>").join("")+"</tr>";
+ }).join("");
+ const cult=p?.cultures||[];
+ document.getElementById("cultBody").innerHTML=Array.from({length:14},(_,i)=>{
+   const c=cult[i]||{};
+   return "<tr><td>"+esc(c.date)+"</td><td>"+esc(c.material)+"</td><td>"+esc(c.gram)+"</td><td>"+esc(c.germe)+"</td><td>"+esc(c.sens)+"</td></tr>";
+ }).join("");
+}
+function backupAll(){
+ persist();const b=new Blob([JSON.stringify(db,null,2)],{type:"application/json"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="backup_evolucao_uti.json";a.click();msg("✓ Backup salvo.");
+}
+function restoreAll(ev){
+ const f=ev.target.files[0];if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.patients)throw 1;db=x;persist();renderPatients();document.getElementById("patientSelect").value=db.selected||"";selectPatient();msg("✓ Backup restaurado.");}catch(e){msg("Backup inválido.");}};
+ r.readAsText(f);ev.target.value="";
+}
+load();
+</script>
+</body>
+</html>
