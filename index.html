@@ -38,8 +38,8 @@ button.primary{font-weight:bold}
 
 .backtitle{border:1px solid #222;border-bottom:0;text-align:center;font-weight:bold;font-size:10.5px;padding:2mm}
 .cult{width:100%;border-collapse:collapse;table-layout:fixed}
-.cult th,.cult td{border:1px solid #222;font-size:8.5px;height:7mm;padding:1mm;text-align:center}
-.cult th:nth-child(1){width:14%}.cult th:nth-child(2){width:23%}.cult th:nth-child(3){width:17%}.cult th:nth-child(4){width:22%}.cult th:nth-child(5){width:24%}
+.cult th,.cult td{border:1px solid #222;font-size:8px;min-height:7mm;height:auto;padding:1mm;text-align:center;vertical-align:top;white-space:normal;overflow-wrap:anywhere}
+.cult th:nth-child(1){width:13%}.cult th:nth-child(2){width:22%}.cult th:nth-child(3){width:19%}.cult th:nth-child(4){width:22%}.cult th:nth-child(5){width:24%}
 
 .pagebreak{page-break-before:always}
 
@@ -57,7 +57,7 @@ button.primary{font-weight:bold}
 <div class="panel">
 <h1>UTI Adulto — Preenchedor de Evolução</h1>
 <div class="instructions">
-<b>V12 atualizada:</b> a frente agora mantém <b>sempre 7 colunas de evolução</b>, como na folha original. Os dias vão sendo preenchidos da esquerda para a direita e as colunas que ainda não têm exame ficam vazias.<br>O programa reconhece tanto o nome completo do laboratório quanto a sigla usada na folha (ex.: <b>Proteína C Reativa → PCR</b>; <b>Sódio → Na+</b>; <b>Potássio → K+</b>).
+<b>Versão atualizada:</b> a frente agora mantém <b>sempre 7 colunas de evolução</b>, como na folha original. Os dias vão sendo preenchidos da esquerda para a direita e as colunas que ainda não têm exame ficam vazias.<br>Reconhece exames laboratoriais e, quando presentes no mesmo texto, bacterioscópicos, culturas e antibiogramas. Prioriza eletrólitos séricos sobre os da gasometria.
 </div>
 
 <h2>Paciente</h2>
@@ -68,7 +68,7 @@ button.primary{font-weight:bold}
 <input id="diuti" placeholder="DI UTI" style="width:100px">
 <button class="primary" onclick="newPatient()">Criar / selecionar paciente</button>
 <button onclick="savePatient()">Salvar dados</button>
-<button onclick="deletePatient()" title="Excluir paciente e seus dados da nuvem" aria-label="Excluir paciente">✕</button>
+<button onclick="deletePatient()" title="Excluir o paciente e seus dados">✕ Excluir paciente</button>
 </div>
 
 <h2>Informações para cálculos do dia <span style="font-weight:normal;font-size:12px">(não aparecem na folha impressa)</span></h2>
@@ -81,12 +81,13 @@ button.primary{font-weight:bold}
 <label>Vasopressor<br><select id="pressor"><option value="none">Nenhum</option><option value="dop_le5">Dopamina ≤5</option><option value="dobutamine">Dobutamina</option><option value="dop_5_15">Dopamina >5–15</option><option value="epi_norepi_le01">Adrenalina/Noradrenalina ≤0,1</option><option value="dop_gt15">Dopamina >15</option><option value="epi_norepi_gt01">Adrenalina/Noradrenalina >0,1</option></select></label>
 </div>
 <p style="font-size:11px;color:#555;margin:5px 0 10px">O programa usa esses dados apenas para calcular P/F e SOFA e grava somente os valores calculados na tabela.</p>
-<textarea id="raw" placeholder="Cole aqui o resultado completo do laboratório do dia."></textarea><br>
-<div class="patientbar" style="margin:6px 0"><label for="collectionSelect">Coluna de coleta:</label><select id="collectionSelect"><option value="">— Selecione uma coleta —</option></select><button onclick="deleteCollection()" title="Excluir a coleta selecionada">✕ Excluir coluna</button></div>
-<button class="primary" onclick="addCollection()">Adicionar na próxima coluna</button>
+<textarea id="raw" placeholder="Cole aqui o resultado completo do laboratório, incluindo culturas se houver."></textarea><br>
+<button class="primary" onclick="addCollection()">Adicionar exames/coletas</button>
+<select id="collectionToDelete" aria-label="Coleta para excluir"><option value="">— Selecionar coleta —</option></select><button onclick="deleteCollection()">Excluir coleta selecionada</button>
 <button onclick="document.getElementById('raw').value=''">Limpar texto</button>
 <button onclick="window.print()">Imprimir frente + verso</button>
 <button onclick="backupAll()">Backup de todos os pacientes</button>
+<button onclick="showDischarged()">Pacientes com alta</button>
 <button onclick="document.getElementById('restore').click()">Restaurar backup</button>
 <input id="restore" type="file" accept=".json" style="display:none" onchange="restoreAll(event)">
 <div id="status" class="status"></div>
@@ -124,14 +125,7 @@ const examRows=["Hemoglobina","Hematócrito","Leucócitos","Mielócitos","Metami
 const aliases={
 "Hemoglobina":["hemoglobina"],"Hematócrito":["hematocrito"],"Leucócitos":["leucocitos"],"Mielócitos":["mielocitos"],"Metamielócitos":["metamielocitos"],"Bastões":["bastoes","bastonados"],"Segmentados":["segmentados"],"Linfócitos":["linfocitos"],"Monócitos":["monocitos"],"Eosinófilos":["eosinofilos"],"Basófilos":["basofilos"],"Plaquetas":["plaquetas"],
 "TTPA ratio":["ttpa ratio"],"TP":["tempo de protrombina","tp"],"INR":["inr"],"Fibrinogênio":["fibrinogenio"],"Bilirrubina T":["bilirrubina total"],"Bilirrubina D":["bilirrubina direta"],"Bilirrubina I":["bilirrubina indireta"],"Albumina":["albumina"],"TGO":["tgo","ast"],"TGP":["tgp","alt"],"Fosf. Alcalina":["fosfatase alcalina"],"Gama GT":["gama gt","ggt"],"Amilase":["amilase"],"Lipase":["lipase"],"LDH":["ldh"],"Triglicerídeos":["triglicerideos"],
-"Ureia":["ureia"],"Creatinina":["creatinina"],
-/* Para eletrólitos, primeiro procurar o exame sérico pelo nome. A gasometria é fallback. */
-"Na+":["sodio","sodium"],"K+":["potassio"],"Mg++":["magnesio"],"Ca++":["calcio"],"Cl-":["cloro"],"PO4-":["fosforo","fosfato"],
-"PCR":["proteina c reativa","pcr"],"CPK":["cpk"],"CPS-MB":["cps-mb","ck-mb","cpk-mb"],"Troponina":["troponina"],
-"pH":["ph"],"PCO2":["pco2"],"PO2":["po2"],"HCO3":["chco3-(p)c","hco3","bicarbonato"],"BE":["cbase(efct)c","base excess","base ef"],"SO2A":["saturacao de o2","saturacao o2","so2a","sao2"],"PO2/FiO2":["po2/fio2","pao2/fio2"],"Lactato":["lactato"],"SOFA":["sofa"]};
-const gasFallbacks={
-"Na+":["cna+"],"K+":["ck+"],"Mg++":["cmg++"],"Ca++":["cca++"],"Cl-":["ccl-"],"PO4-":["cpo4-"]
-};
+"Ureia":["ureia"],"Creatinina":["creatinina"],"Na+":["sodio","na+","na","cna+"],"K+":["potassio","k+","k","ck+"],"Mg++":["magnesio","mg++","mg","cmg++"],"Ca++":["calcio","ca++","ca","cca++"],"Cl-":["cloro","cl-","cl","ccl-"],"PO4-":["fosforo","po4-","po4"],"PCR":["proteina c reativa","pcr"],"CPK":["cpk"],"CPS-MB":["cps-mb","ck-mb","cpk-mb"],"Troponina":["troponina"],"pH":["ph"],"PCO2":["pco2"],"PO2":["po2"],"HCO3":["hco3","bicarbonato","chco3-(p)c"],"BE":["base ef","base excess","cbase(efct)c"],"SO2A":["saturacao de o2","saturacao o2","so2a","sao2"],"PO2/FiO2":["po2/fio2","pao2/fio2"],"Lactato":["lactato"],"SOFA":["sofa"]};
 
 let db={patients:{},selected:""};
 
@@ -229,34 +223,65 @@ function newPatient(){
  db.selected=id;persist();renderPatients();document.getElementById("patientSelect").value=id;render();
  msg("✓ Paciente selecionado: "+name);
 }
+function dischargePatient(){
+ if(!db.selected){msg("Primeiro selecione um paciente.");return}
+ const p=current();
+ if(!p)return;
+ if(!confirm("Dar alta de "+p.name+"? Os dados serão mantidos arquivados."))return;
+ p.active=false;
+ p.dischargeDate=new Date().toLocaleDateString("pt-BR");
+ const old=p.name;
+ db.selected="";
+ persist();
+ renderPatients();
+ document.getElementById("patientSelect").value="";
+ document.getElementById("name").value="";
+ document.getElementById("age").value="";
+ document.getElementById("diuti").value="";
+ render();
+ msg("✓ Alta registrada para "+old+". Os dados continuam arquivados.");
+}
+
 async function deletePatient(){
   if(!db.selected){msg("Primeiro selecione um paciente.");return}
-  const p=current();
-  if(!p)return;
-  if(!confirm("Excluir "+p.name+" e TODOS os dados desse paciente da lista e da nuvem? Essa ação não pode ser desfeita. Faça um backup antes se quiser guardar os dados."))return;
+  const p=current(); if(!p)return;
+  if(!confirm("Excluir DEFINITIVAMENTE "+p.name+" e os dados deste paciente? Esta ação não pode ser desfeita. Faça backup antes."))return;
   try{
-    let url;
-    if(p.cloudId) url=SUPABASE_URL+"/rest/v1/pacientes?id=eq."+encodeURIComponent(p.cloudId);
-    else url=SUPABASE_URL+"/rest/v1/pacientes?nome=eq."+encodeURIComponent(p.name);
-    const r=await fetch(url,{method:"DELETE",headers:{"apikey":SUPABASE_KEY,"Authorization":"Bearer "+SUPABASE_KEY,"Prefer":"return=minimal"}});
-    if(!r.ok)throw new Error("HTTP "+r.status+": "+await r.text());
-    const old=p.name;
+    if(p.cloudId){
+      const r=await fetch(SUPABASE_URL+"/rest/v1/pacientes?id=eq."+encodeURIComponent(p.cloudId),{method:"DELETE",headers:SB_HEADERS});
+      if(!r.ok)throw new Error("Supabase HTTP "+r.status+": "+await r.text());
+    }else{
+      const r=await fetch(SUPABASE_URL+"/rest/v1/pacientes?nome=eq."+encodeURIComponent(p.name),{method:"DELETE",headers:SB_HEADERS});
+      if(!r.ok)throw new Error("Supabase HTTP "+r.status+": "+await r.text());
+    }
     delete db.patients[db.selected];
     db.selected="";
-    persistLocal();
-    renderPatients();
+    persistLocal();renderPatients();
     document.getElementById("patientSelect").value="";
     document.getElementById("name").value="";
     document.getElementById("age").value="";
     document.getElementById("diuti").value="";
-    render();
-    msg("✓ Paciente "+old+" excluído da lista e da nuvem.");
-  }catch(e){
-    console.error(e);
-    msg("⚠ Não foi possível excluir da nuvem. Nenhum dado foi removido desta tela: "+e.message);
-  }
+    render();msg("Paciente excluído da lista e da nuvem.");
+  }catch(e){console.error(e);msg("Não foi possível excluir na nuvem: "+e.message+". Nenhum dado local foi removido.");}
+}
+function deleteCollection(){
+  const p=current();
+  if(!p){msg("Selecione um paciente.");return}
+  const sel=document.getElementById("collectionToDelete");
+  const idx=Number(sel.value);
+  if(sel.value==="" || !Number.isInteger(idx) || idx<0 || idx>=p.cols.length){msg("Selecione a coleta que deseja excluir.");return}
+  const c=p.cols[idx];
+  if(!confirm("Excluir a coleta "+(c.date||("nº "+(idx+1)))+"? Esta ação não pode ser desfeita."))return;
+  p.cols.splice(idx,1);
+  persist();render();msg("Coleta excluída.");
 }
 
+function showDischarged(){
+ const ids=Object.keys(db.patients).filter(id=>db.patients[id].active===false);
+ if(!ids.length){msg("Não há pacientes com alta arquivados.");return}
+ const names=ids.sort().map(id=>db.patients[id].name+" (alta: "+(db.patients[id].dischargeDate||"sem data")+")").join("\n");
+ alert("PACIENTES COM ALTA\n\n"+names+"\n\nOs dados permanecem salvos no backup e no navegador.");
+}
 function savePatient(){
  if(!db.selected){newPatient();return}
  const p=current();
@@ -272,29 +297,140 @@ function detectDate(t){
 function norm(s){
  return String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
 }
-function valueForAliases(text, aliasList){
-  const s=norm(text).replace(/\r?\n/g," ");
-  for(const a of (aliasList||[])){
-    const aa=norm(a);
-    const safe=aa.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-    const re=new RegExp(safe+"\\s*[:=]?\\s*(-?\\d+(?:[.,]\\d+)?)","i");
-    const m=s.match(re);
-    if(m)return m[1];
-  }
-  return "";
-}
 function getValue(text,label){
-  // Eletrólitos: o resultado sérico nominal sempre tem prioridade.
-  // Só usa o valor da gasometria quando o exame sérico não foi encontrado.
-  const serum=valueForAliases(text,aliases[label]||[label]);
-  if(serum!=="")return serum;
-  if(gasFallbacks[label])return valueForAliases(text,gasFallbacks[label]);
+ const s=norm(text).replace(/\r?\n/g," ");
+ for(const a of (aliases[label]||[label])){
+   const aa=norm(a);
+   const boundary = aa.length<=2 ? "\\b" : "";
+   const safe=aa.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+   const re=new RegExp(boundary+safe+"\\s*[:=]?\\s*(-?\\d+(?:[.,]\\d+)?)","i");
+   const m=s.match(re);if(m)return m[1];
+ }
+ return "";
+}
+
+function cleanLabText(text){
+  return String(text||"").replace(/<br\s*\/?>/gi,"\n").replace(/&nbsp;|&#160;/gi," ")
+    .replace(/&gt;/gi,">").replace(/&lt;/gi,"<").replace(/&amp;/gi,"&")
+    .replace(/\*\*/g,"").replace(/\*/g,"").replace(/\r/g,"");
+}
+function getElectrolyteValue(text,label){
+  const t=cleanLabText(text);
+  const serumAliases={
+    "Na+":[/\bs[oó]dio\s*:?\s*(-?\d+(?:[.,]\d+)?)/i,/(?:^|\n)\s*na\s*:?\s*(-?\d+(?:[.,]\d+)?)/i],
+    "K+":[/\bpot[aá]ssio\s*:?\s*(-?\d+(?:[.,]\d+)?)/i,/(?:^|\n)\s*k\s*:?\s*(-?\d+(?:[.,]\d+)?)/i],
+    "Mg++":[/\bmagn[eé]sio\s*:?\s*(-?\d+(?:[.,]\d+)?)/i],
+    "Ca++":[/\bc[aá]lcio\s*:?\s*(-?\d+(?:[.,]\d+)?)/i],
+    "Cl-":[/\bcloro\s*:?\s*(-?\d+(?:[.,]\d+)?)/i]
+  };
+  for(const re of (serumAliases[label]||[])){const m=t.match(re);if(m)return m[1];}
+  const gasAliases={
+    "Na+":[/\bcna\+\s*:?\s*(-?\d+(?:[.,]\d+)?)/i],
+    "K+":[/\bck\+\s*:?\s*(-?\d+(?:[.,]\d+)?)/i],
+    "Mg++":[/\bcmg\+\+\s*:?\s*(-?\d+(?:[.,]\d+)?)/i],
+    "Ca++":[/\bcca\+\+\s*:?\s*(-?\d+(?:[.,]\d+)?)/i],
+    "Cl-":[/\bccl-\s*:?\s*(-?\d+(?:[.,]\d+)?)/i]
+  };
+  for(const re of (gasAliases[label]||[])){const m=t.match(re);if(m)return m[1];}
   return "";
 }
+function cultureDate(block, fullText){
+  let m=block.match(/Colheita\/Recebimento\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i);
+  if(!m)m=block.match(/Atendimento\s*:?\s*(\d{2}\/\d{2}\/\d{4})/i);
+  if(m)return m[1];
+  return detectDate(fullText)||"";
+}
+function cleanCultureValue(v){
+  return String(v||"").replace(/\\[nrt]/g," ").replace(/&#x[0-9a-f]+;|&nbsp;/gi," ")
+    .replace(/\s+/g," ").replace(/[|\\]+$/g,"").trim();
+}
+function parseCultures(text){
+  const raw=cleanLabText(text);
+  const normalized=raw.replace(/\\n/g,"\n").replace(/\\x20/g," ");
+  const marker=/BACTERIOSC[ÓO]PICO(?!\s*\(Gram\))|BACTERIOL[ÓO]GICO\s*e\s*ANTIBIOGRAMA|\bCULTURA\b/gi;
+  const starts=[]; let m;
+  while((m=marker.exec(normalized))!==null) starts.push({index:m.index,end:marker.lastIndex,title:m[0]});
+  const found=[];
+  for(let i=0;i<starts.length;i++){
+    const st=starts[i], en=starts[i+1]?.index??normalized.length;
+    let block=normalized.slice(st.index,en);
+    if(!/material\s*:/i.test(block)) continue;
+    let mm=block.match(/Material\s*:?\s*([^\n]+)/i);
+    let material=cleanCultureValue(mm?.[1]||"");
+    material=material.replace(/Via de acesso[\s\S]*$/i,"").replace(/\s{2,}.*/,"").trim();
+    if(!material) continue;
+    const entry={date:cultureDate(block,normalized),material,gram:"",germe:"",sens:""};
+    if(/BACTERIOSC[ÓO]PICO/i.test(st.title) || /BACTERIOSC[ÓO]PICO\s*\(Gram\)/i.test(block)){
+      let gm=block.match(/GRAM\s*:?\s*([\s\S]*?)(?=Colheita\/Recebimento|Liberado por|LAUDO SOMENTE|$)/i);
+      if(!gm) gm=block.match(/BACTERIOSC[ÓO]PICO\s*\(Gram\)\s*:?\s*([\s\S]*?)(?=Colheita\/Recebimento|Liberado por|LAUDO SOMENTE|$)/i);
+      if(gm){
+        let lines=gm[1].split(/\n/).map(cleanCultureValue).filter(x=>x && !/^(ap[oó]s o enriquecimento|gram|material|m[eé]todo|via de acesso)/i.test(x));
+        entry.gram=lines.join("; ").slice(0,350);
+      }
+    }
+    if(/BACTERIOL[ÓO]GICO/i.test(st.title)){
+      const mic=block.match(/Microrganismo\s*1\s*:?\s*([\s\S]*?)(?=\n|MICRORGANISMO\s*1|CARBAPENENS|$)/i);
+      if(mic) entry.germe=cleanCultureValue(mic[1]).replace(/^[:\s]+/,"");
+      const carb=block.match(/CARBAPENENS?\s*=\s*([^\n]+)/i);
+      if(carb) entry.germe=(entry.germe+"; Carbapenêmicos "+cleanCultureValue(carb[1])).replace(/^;\s*/,"");
+      const abx=[];
+      for(const line of block.split(/\n/)){
+        const am=line.match(/^\s*([A-ZÁÉÍÓÚÂÊÔÃÕÇ0-9 /()+-]+?)\.{3,}\s*(.*?)\s*([SRI])\s*$/i);
+        if(am){
+          const drug=cleanCultureValue(am[1]).replace(/[.\s]+$/,"");
+          const micval=cleanCultureValue(am[2]).replace(/[.\s]+$/,"");
+          abx.push(drug+(micval&&micval!=="-"?(" "+micval):"")+" "+am[3].toUpperCase());
+        }
+      }
+      entry.sens=abx.join("; ");
+      if(!entry.gram){
+        const gm=block.match(/BACTERIOSC[ÓO]PICO\s*\(Gram\)\s*:?\s*([\s\S]*?)(?=Colheita\/Recebimento|Liberado por|LAUDO SOMENTE|$)/i);
+        if(gm) entry.gram=gm[1].split(/\n/).map(cleanCultureValue).filter(Boolean).join("; ");
+      }
+    }
+    if(/^CULTURA$/i.test(st.title.trim())){
+      const cm=block.match(/(?:^|\n)\s*(Não houve desenvolvimento[^.\n]*\.?|Aus[eê]ncia de crescimento[^.\n]*\.?|Crescimento[^.\n]*\.?)/i);
+      if(cm) entry.germe=cleanCultureValue(cm[1]);
+    }
+    found.push(entry);
+  }
+  // Mescla Gram, cultura e antibiograma do mesmo material e data em uma única linha.
+  const merged=[];
+  for(const e of found){
+    let target=merged.find(x=>norm(x.material)===norm(e.material)&&x.date===e.date);
+    if(!target){target={...e};merged.push(target);continue;}
+    for(const k of ["gram","germe","sens"]){
+      if(e[k] && !target[k].includes(e[k])) target[k]=[target[k],e[k]].filter(Boolean).join("; ");
+    }
+  }
+  return merged;
+}
+function saveCultureResults(patient, parsed){
+  if(!patient.cultures) patient.cultures=[];
+  for(const e of parsed){
+    let old=patient.cultures.find(x=>norm(x.material||"")===norm(e.material||"") && (x.date||"")===e.date);
+    if(!old){
+      if(patient.cultures.length>=14) continue;
+      patient.cultures.push({...e});
+    }else{
+      for(const k of ["gram","germe","sens"]) if(e[k]) old[k]=e[k];
+    }
+  }
+}
+
 function parseCollection(text){
   const p=current();
   const c={date:detectDate(text)||("Coleta "+((p?.cols?.length||0)+1)),values:{}};
   examRows.forEach(e=>c.values[e]=getValue(text,e));
+  ["Na+","K+","Mg++","Ca++","Cl-"].forEach(e=>{
+    const v=getElectrolyteValue(text,e); if(v) c.values[e]=v;
+  });
+  c.values["Bastões"]=c.values["Bastões"]||getValue(cleanLabText(text).replace(/bastonados/gi,"bastoes"),"Bastões");
+  const gas=cleanLabText(text);
+  const be=gas.match(/cBase\s*\(\s*Efct\s*\)\s*c\s*:?\s*(-?\d+(?:[.,]\d+)?)/i);
+  const hco3=gas.match(/cHCO3-\s*\(\s*P\s*\)\s*c\s*:?\s*(-?\d+(?:[.,]\d+)?)/i);
+  if(be)c.values["BE"]=be[1];
+  if(hco3)c.values["HCO3"]=hco3[1];
   return c;
 }
 function num(v){return v===""||v==null?null:parseFloat(String(v).replace(",", "."));}
@@ -343,44 +479,28 @@ function clearCalcFields(){
  document.getElementById("respSupport").value="no";
  document.getElementById("pressor").value="none";
 }
-function addCollection(){
- if(!db.selected){msg("Primeiro crie/selecione o paciente.");return}
- const raw=document.getElementById("raw").value.trim();
- if(!raw){msg("Cole o resultado do laboratório.");return}
- const p=current();
- if(p.cols.length>=MAX_COLS){msg("As 7 colunas da folha já estão preenchidas. Para continuar, será necessária uma nova folha.");return}
- const c=parseCollection(raw);
- calculateScores(c);
- p.cols.push(c);persist();render();document.getElementById("raw").value="";clearCalcFields();
- msg("✓ Coleta adicionada na coluna "+p.cols.length+" com P/F e SOFA calculados quando havia dados suficientes.");
-}
-function updateCollectionSelector(cols){
-  const sel=document.getElementById("collectionSelect");
-  if(!sel)return;
-  const previous=sel.value;
-  sel.innerHTML='<option value="">— Selecione uma coleta —</option>';
-  cols.forEach((c,i)=>{
-    const o=document.createElement("option");
-    o.value=String(i);
-    o.textContent="Coluna "+(i+1)+" — "+(c.date||("Coleta "+(i+1)));
-    sel.appendChild(o);
-  });
-  if(previous!=="" && Number(previous)<cols.length)sel.value=previous;
-}
-async function deleteCollection(){
-  if(!db.selected){msg("Primeiro selecione um paciente.");return}
+async function addCollection(){
+  if(!db.selected){msg("Primeiro crie/selecione o paciente.");return}
+  const raw=document.getElementById("raw").value.trim();
+  if(!raw){msg("Cole o resultado do laboratório.");return}
   const p=current();
-  const sel=document.getElementById("collectionSelect");
-  if(!p||!sel||sel.value===""){msg("Selecione a coluna de coleta que deseja excluir.");return}
-  const i=Number(sel.value);
-  const c=p.cols[i];
-  if(!c)return;
-  if(!confirm("Excluir a coluna "+(i+1)+" ("+(c.date||"sem data")+") de "+p.name+"?"))return;
-  p.cols.splice(i,1);
+  const c=parseCollection(raw);
+  const parsedCultures=parseCultures(raw);
+  const hasLabs=Object.entries(c.values).some(([k,v])=>v!=="" && k!=="PO2/FiO2" && k!=="SOFA");
+  if(!hasLabs && !parsedCultures.length){msg("Não encontrei exames laboratoriais ou resultados de cultura reconhecíveis.");return}
+  if(hasLabs){
+    if(p.cols.length>=MAX_COLS){msg("As 7 colunas da folha já estão preenchidas. Para continuar, será necessária uma nova folha.");return}
+    calculateScores(c);
+    p.cols.push(c);
+  }
+  const oldCount=(p.cultures||[]).length;
+  saveCultureResults(p,parsedCultures);
+  const cultureCount=(p.cultures||[]).length-oldCount;
   const ok=await persist();
   render();
-  if(ok)msg("✓ Coluna de coleta excluída e dados salvos na nuvem.");
-  else msg("⚠ Coluna excluída nesta tela, mas houve falha ao salvar na nuvem. Tente salvar novamente.");
+  document.getElementById("raw").value="";
+  clearCalcFields();
+  msg((hasLabs?"✓ Exames adicionados. ":"")+(parsedCultures.length?"Culturas/antibiogramas reconhecidos e salvos. ":"")+(ok?"Dados salvos na nuvem.":"⚠ Confira a conexão com a nuvem."));
 }
 function render(){
  const p=current();
@@ -388,7 +508,6 @@ function render(){
  document.getElementById("page").textContent=p?.age||"";
  document.getElementById("pdi").textContent=p?.diuti||"";
  const cols=p?.cols||[];
- updateCollectionSelector(cols);
  let head="<tr><th>Data:</th>";
  for(let i=0;i<MAX_COLS;i++)head+="<th>"+esc(cols[i]?.date||"")+"</th>";
  head+="</tr>";
